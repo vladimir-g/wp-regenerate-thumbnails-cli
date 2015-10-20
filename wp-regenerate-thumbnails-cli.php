@@ -118,13 +118,26 @@ Usage:
 php /path/to/wp-regenerate-thumbnails-cli.php -p|--path /path/to/wp/root/
     -p|--path -- path to Wordpress root directory (required)
     -h|--help -- print this message and exit
+    -s|--silent -- don't print messages (except php errors/warnings)
 
 EOD;
+
+define('SILENT', false);
 
 // Print text to terminal
 function printc($text) {
     if (!SILENT)
         echo $text."\n";
+}
+
+
+// Check if option is provided
+function hasOption($options, $short=null, $long=null)
+{
+    return (!empty(array_intersect(
+        array($short, $long),
+        array_keys($options)
+    )));
 }
 
 // Command line entry point
@@ -136,21 +149,19 @@ function main() {
     ));
 
     // Check if help requested
-    if (!empty(array_intersect(array('h', 'help'),
-                               array_keys($options)))) {
+    if (hasOption($options, 'h', 'help')) {
         printc(HELP);
         die();
     }
 
-    if (empty(array_intersect(array('p', 'path'),
-                              array_keys($options)))) {
+    if (!hasOption($options, 'p', 'path')) {
         printc("Error: path required\n");
         printc(HELP);
         die();
     }
 
-    define('SILENT', (!empty(array_intersect(array('s', 'silent'),
-                                             array_keys($options)))));
+    define('SILENT', hasOption($options, 's', 'silent'));
+
     // Process path
     $path = array_key_exists('p', $options) ? $options['p'] : $options['path'];
     printc('Using path: '.$path);
