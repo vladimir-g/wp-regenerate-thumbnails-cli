@@ -1,14 +1,19 @@
 <?php
 namespace WpRegenerateThumbnailsCli;
 
+class RegeneratorException extends \Exception { }
+
 class Regenerator
 {
     public $width = 40;
 
-    public function __construct($wpRoot, $silent=true)
+    public function __construct($wpRoot, $remove=false,
+                                $debug=false, $silent=true)
     {
         $this->root = $wpRoot;
         $this->silent = $silent;
+        $this->remove = $remove;
+        $this->debug = $debug;
         // Load Wordpress
         $this->msg('Loading Wordpress');
         define('BASE_PATH', $this->root);
@@ -22,6 +27,13 @@ class Regenerator
             'includes',
             'image.php'
         ));
+        $uploadDir = \wp_upload_dir();
+        if ($uploadDir['error']) {
+            $err = 'Upload dir error: '.$uploadDir['error'];
+            $this->msg($err);
+            throw RegeneratorException($err);
+        }
+        $this->uploadDir = $uploadDir['basedir'];
         global $wpdb;
         $this->wpdb = $wpdb;
     }
@@ -83,6 +95,8 @@ class Regenerator
             // Update metadata
             if (!$skip) {
                 \wp_update_attachment_metadata($image->ID, $metadata);
+                if ($this->remove)
+                    $this->removeOld($metadata);
             }
             // Show progress
             if ($error !== null) {
@@ -94,6 +108,48 @@ class Regenerator
         }
         $this->msg('');         // End
         return $errors;
+    }
+
+    // Remove old thumbnails
+    public function removeOld($metadata)
+    {
+        $file = new \SplFileInfo($metadata['file']);
+
+        $dir = $this->makePath($this->uploadDir, dirname($metadata['file']));
+
+        // Get regex for files
+        $ext = $file->getExtension();
+        $basename = $file->getBasename('.'.$ext);
+        $regex = '_^'.          // O_o
+               preg_quote($basename, '_').
+               '\-[\d]+x[\d]+\.'.
+               preg_quote($ext, '_').
+               '$_';
+
+        // Create list of existing files
+        $dirIt = new \DirectoryIterator($dir);
+        $regexIt = new \RegexIterator($dirIt, $regex);
+        $existing = array();
+        foreach ($regexIt as $f) {
+            $existing[] = $f->getPathName();
+        }
+
+        // Get list of remaining files
+        $remaining = array(
+            $this->makePath($dir, $file->getFilename())
+        );
+        foreach ($metadata['sizes'] as $k => $v) {
+            $remaining[] = $this->makePath($dir, $v['file']);
+        }
+
+        // Delete old
+        foreach (array_diff($existing, $remaining) as $f) {
+            if ($this->debug) {
+                $this->msg('DEBUG: removing '.$f);
+            } else {
+                unlink($f);
+            }
+        };
     }
 
     protected function printProgress($count, $overall) {
@@ -119,14 +175,14 @@ php /path/to/wp-regenerate-thumbnails-cli.php -p|--path /path/to/wp/root/
     -p|--path -- path to Wordpress root directory (required)
     -h|--help -- print this message and exit
     -s|--silent -- don't print messages (except php errors/warnings)
-
+    -r|--remove -- remove old images (warning, experimental)
+    -d|--debug -- don't really remove images, just print filenames
 EOD;
 
-define('SILENT', false);
 
 // Print text to terminal
-function printc($text) {
-    if (!SILENT)
+function printc($text, $silent=false) {
+    if (!$silent)
         echo $text."\n";
 }
 
@@ -142,9 +198,11 @@ function hasOption($options, $short=null, $long=null)
 
 // Command line entry point
 function main() {
-    $options = getopt("hsp:", array(
+    $options = getopt("hdsrp:", array(
         'help',
+        'debug',
         'silent',
+        'remove',
         'path:',
     ));
 
@@ -160,11 +218,18 @@ function main() {
         die();
     }
 
-    define('SILENT', hasOption($options, 's', 'silent'));
+    $silent = hasOption($options, 's', 'silent');
+    $debug = hasOption($options, 'd', 'debug');
+    // Disable silent on debug
+    if ($debug)
+        $silent = false;
+    $remove = hasOption($options, 'r', 'remove');
 
     // Process path
     $path = array_key_exists('p', $options) ? $options['p'] : $options['path'];
-    printc('Using path: '.$path);
+    printc('Using path: '.$path, $silent);
+    printc('Remove is: '.($remove ? 'on' : 'off'), $silent);
+    printc('Remove debug is: '.($debug ? 'on' : 'off'), $silent);
     $path = realpath($path);
     if ($path === NULL || !is_dir($path)) {
         printc('Error: directory does not exists');
@@ -173,7 +238,7 @@ function main() {
     // Add directory separator to path
     $path = rtrim($path, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
 
-    $regenerator = new Regenerator($path, SILENT);
+    $regenerator = new Regenerator($path, $remove, $debug, $silent);
     $regenerator->run();
 }
 
