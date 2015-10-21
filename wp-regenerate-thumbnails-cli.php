@@ -190,10 +190,11 @@ function printc($text, $silent=false) {
 // Check if option is provided
 function hasOption($options, $short=null, $long=null)
 {
-    return (!empty(array_intersect(
+    $int = array_intersect(
         array($short, $long),
         array_keys($options)
-    )));
+    );
+    return (!empty($int));
 }
 
 // Command line entry point
