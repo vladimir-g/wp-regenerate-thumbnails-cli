@@ -72,32 +72,7 @@ class Regenerator
         $counter = 0;
         $errors = array();
         foreach ($images as $image) {
-            // Get attachment path
-            $path = get_attached_file($image->ID);
-            $skip = false;
-            $error = null;
-            if ($path === false || !file_exists($path)) {
-                $error = 'Error: file does not exists for ID '.$image->ID;
-                $skip = true;
-            }
-            // Generate new metadata
-            $metadata = \wp_generate_attachment_metadata($image->ID, $path);
-            if (!$skip && empty($metadata)) {
-                $error = 'Error: metadata error for ID '.$image->ID;
-                $skip = true;
-            }
-            if (!$skip && is_wp_error($metadata)) {
-                $error = 'Error: metadata error for ID '.
-                    $image->ID.': "'.
-                    $metadata->get_error_message().'"';
-                $skip = true;
-            }
-            // Update metadata
-            if (!$skip) {
-                \wp_update_attachment_metadata($image->ID, $metadata);
-                if ($this->remove)
-                    $this->removeOld($metadata);
-            }
+            $error = $this->regenerateMetadata($image->ID);
             // Show progress
             if ($error !== null) {
                 $errors[] = $error;
@@ -108,6 +83,38 @@ class Regenerator
         }
         $this->msg('');         // End
         return $errors;
+    }
+
+    // Regenerate thumbnails and update metadata
+    public function regenerateMetadata($id)
+    {
+        // Get attachment path
+        $path = get_attached_file($id);
+        $skip = false;
+        $error = null;
+        if ($path === false || !file_exists($path)) {
+            $error = 'Error: file does not exists for ID '.$id;
+            $skip = true;
+        }
+        // Generate new metadata
+        $metadata = \wp_generate_attachment_metadata($id, $path);
+        if (!$skip && empty($metadata)) {
+            $error = 'Error: metadata error for ID '.$id;
+            $skip = true;
+        }
+        if (!$skip && is_wp_error($metadata)) {
+            $error = 'Error: metadata error for ID '.
+                $image->ID.': "'.
+                $metadata->get_error_message().'"';
+            $skip = true;
+        }
+        // Update metadata
+        if (!$skip) {
+            \wp_update_attachment_metadata($id, $metadata);
+            if ($this->remove)
+                $this->removeOld($metadata);
+        }
+        return $error;
     }
 
     // Remove old thumbnails
