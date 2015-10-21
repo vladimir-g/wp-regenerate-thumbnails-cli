@@ -5,28 +5,15 @@ class RegeneratorException extends \Exception { }
 
 class Regenerator
 {
-    public $width = 40;
+    public $width = 40;         // Progress bar width
 
-    public function __construct($wpRoot, $remove=false,
-                                $debug=false, $silent=true)
+    public function __construct($remove=false, $debug=false, $silent=true)
     {
-        $this->root = $wpRoot;
         $this->silent = $silent;
         $this->remove = $remove;
         $this->debug = $debug;
-        // Load Wordpress
-        $this->msg('Loading Wordpress');
-        define('BASE_PATH', $this->root);
-        define('WP_USE_THEMES', false);
-        // Require main wp loader
-        require_once($this->makePath($this->root, 'wp-load.php'));
-        // Require attachment functions
-        require_once($this->makePath(
-            $this->root,
-            'wp-admin',
-            'includes',
-            'image.php'
-        ));
+        // Wordpress variables
+        $this->root = \get_home_path();
         $uploadDir = \wp_upload_dir();
         if ($uploadDir['error']) {
             $err = 'Upload dir error: '.$uploadDir['error'];
@@ -243,9 +230,20 @@ function main() {
         die();
     }
     // Add directory separator to path
-    $path = rtrim($path, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR;
+    $ds = DIRECTORY_SEPARATOR;
+    $path = rtrim($path, $ds).$ds;
 
-    $regenerator = new Regenerator($path, $remove, $debug, $silent);
+    // Include Wordpress files
+    printc('Loading Wordpress', $silent);
+    define('BASE_PATH', $path);
+    define('WP_USE_THEMES', false);
+    // Require main wp loader
+
+    require_once($path.'wp-load.php');
+    require_once($path.'wp-admin'.$ds.'includes'.$ds.'image.php');
+    require_once($path.'wp-admin'.$ds.'includes'.$ds.'file.php');
+
+    $regenerator = new Regenerator($remove, $debug, $silent);
     $regenerator->run();
 }
 
