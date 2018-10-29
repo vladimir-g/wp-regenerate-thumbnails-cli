@@ -1,3 +1,5 @@
+You might be looking for the documentation of the `built-in wp-cli command <https://developer.wordpress.org/cli/commands/media/regenerate/>`_.
+
 ========================================
 Regenerate Wordpress thumbnails from CLI
 ========================================
